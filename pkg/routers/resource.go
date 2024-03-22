@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"github.com/CloudNativeGame/aigc-gateway/pkg/resources"
 	mem "github.com/CloudNativeGame/aigc-gateway/pkg/session"
+	"github.com/CloudNativeGame/aigc-gateway/pkg/storage"
 	"github.com/CloudNativeGame/aigc-gateway/pkg/user"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/logto-io/go/client"
 	"github.com/logto-io/go/core"
+	"k8s.io/klog/v2"
 )
 
 func RegisterResourceRouters(router *gin.Engine, logtoConfig *client.LogtoConfig) {
@@ -125,10 +127,15 @@ func RegisterResourceRouters(router *gin.Engine, logtoConfig *client.LogtoConfig
 		err = user.UpdateUserMetaData(userInfo.Sub, cm)
 		if err != nil {
 			ctx.Error(err)
+			klog.Errorf("User %s CreateResource %s id %s failed: %v", userInfo.Username, meta.Name, meta.ID, err)
+		} else {
+			err = storage.Get().UpdateStatus(ctx, userInfo.Username, meta)
+			if err != nil {
+				ctx.Error(err)
+			}
 		}
-
+		klog.Infof("User %s CreateResource %s id %s", userInfo.Username, meta.Name, meta.ID)
 		ctx.JSON(200, meta)
-
 	})
 
 	router.POST("/resource/:namespace/:name/pause", func(ctx *gin.Context) {
@@ -170,9 +177,12 @@ func RegisterResourceRouters(router *gin.Engine, logtoConfig *client.LogtoConfig
 		resourceManager := resources.NewResourceManager()
 		err = resourceManager.PauseResource(rm)
 
+		storage.Get().DeleteRecord(ctx, rm)
+
 		if err != nil {
 			ctx.String(400, err.Error())
 		}
+		klog.Infof("User %s PauseResource %s id %s", userInfo.Username, rm.Name, rm.ID)
 		ctx.Status(200)
 	})
 
@@ -218,7 +228,14 @@ func RegisterResourceRouters(router *gin.Engine, logtoConfig *client.LogtoConfig
 
 		if err != nil {
 			ctx.String(400, err.Error())
+			klog.Errorf("User %s RecoverResource %s id %s failed, err:%s", userInfo.Username, rm.Name, rm.ID, err.Error())
+		} else {
+			err = storage.Get().UpdateStatus(ctx, userInfo.Username, rm)
+			if err != nil {
+				ctx.Error(err)
+			}
 		}
+		klog.Infof("User %s RecoverResource %s id %s", userInfo.Username, rm.Name, rm.ID)
 		ctx.Status(200)
 		return
 	})
@@ -266,6 +283,9 @@ func RegisterResourceRouters(router *gin.Engine, logtoConfig *client.LogtoConfig
 		err = resourceManager.DeleteResource(rm)
 		if err != nil {
 			ctx.Error(err)
+			klog.Errorf("User %s DeleteResource %s id %s, failed:%v", userInfo.Username, rm.Name, rm.ID, err)
+		} else {
+			storage.Get().DeleteRecord(ctx, rm)
 		}
 
 		cm[key] = nil
@@ -275,6 +295,7 @@ func RegisterResourceRouters(router *gin.Engine, logtoConfig *client.LogtoConfig
 			ctx.Error(err)
 			return
 		}
+		klog.Infof("User %s DeleteResource %s id %s", userInfo.Username, rm.Name, rm.ID)
 
 		ctx.Status(200)
 		return
@@ -323,8 +344,12 @@ func RegisterResourceRouters(router *gin.Engine, logtoConfig *client.LogtoConfig
 		err = resourceManager.RestartResource(rm)
 		if err != nil {
 			ctx.Error(err)
+			klog.Errorf("User %s DeleteResource %s id %s, failed:%v", userInfo.Username, rm.Name, rm.ID, err)
 			return
+		} else {
+			err = storage.Get().UpdateStatus(ctx, userInfo.Username, rm)
 		}
+		klog.Infof("User %s DeleteResource %s id %s", userInfo.Username, rm.Name, rm.ID)
 
 		ctx.Status(200)
 		return

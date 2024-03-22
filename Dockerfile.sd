@@ -1,0 +1,3 @@
+FROM yunqi-registry.cn-shanghai.cr.aliyuncs.com/lab/stable-diffusion:v1.0.0-cpu
+
+COPY ./extensions/stable-diffusion-webui-images-browser /stable-diffusion-webui/extensions/

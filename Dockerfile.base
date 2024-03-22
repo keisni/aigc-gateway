@@ -1,0 +1,7 @@
+FROM alpine:3.17
+
+RUN apk add --no-cache ca-certificates bash expat curl \
+  && rm -rf /var/cache/apk/*
+
+RUN mkdir -p /app
+WORKDIR /app

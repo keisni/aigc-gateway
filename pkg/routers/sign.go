@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/CloudNativeGame/aigc-gateway/pkg/resources"
 	mem "github.com/CloudNativeGame/aigc-gateway/pkg/session"
+	"github.com/CloudNativeGame/aigc-gateway/pkg/storage"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/logto-io/go/client"
@@ -81,6 +82,7 @@ func RegisterSignRouters(router *gin.Engine, logtoConfig *client.LogtoConfig) {
 
 			if endpoint != "" && strings.Contains(originUrl, endpoint) {
 				ctx.String(http.StatusOK, "")
+				storage.Get().UpdateStatus(ctx, userInfo.Name, rm)
 				return
 			}
 		}

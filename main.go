@@ -1,17 +1,40 @@
 package main
 
 import (
+	"github.com/CloudNativeGame/aigc-gateway/pkg/autofree"
+	"github.com/CloudNativeGame/aigc-gateway/pkg/options"
 	"github.com/CloudNativeGame/aigc-gateway/pkg/routers"
+	"github.com/CloudNativeGame/aigc-gateway/pkg/signals"
+	"github.com/CloudNativeGame/aigc-gateway/pkg/storage"
 	"github.com/CloudNativeGame/aigc-gateway/pkg/utils"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/memstore"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/logto-io/go/client"
+	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/util/wait"
+	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 	"os"
+	"time"
 )
 
+var logFlushFreq = pflag.Duration("log-flush-frequency", 5*time.Second, "Maximum number of seconds between log flushes")
+
 func main() {
+	klog.InitFlags(nil)
+
+	serverOpts := options.NewServerOption()
+	serverOpts.AddFlags(pflag.CommandLine)
+
+	cliflag.InitFlags()
+
+	go wait.Until(klog.Flush, *logFlushFreq, wait.NeverStop)
+	defer klog.Flush()
+
+	ctx := signals.SetupSignalContext()
+
 	router := gin.Default()
 	// load templates
 	router.Delims("{[{", "}]}")
@@ -36,6 +59,9 @@ func main() {
 	router.Use(sessions.Sessions("logto-session", store))
 	routers.RegisterSignRouters(router, logtoConfig)
 	routers.RegisterResourceRouters(router, logtoConfig)
+
+	storage.Initialize(serverOpts)
+	autofree.Run(ctx, serverOpts)
 
 	router.Run(":8090")
 }

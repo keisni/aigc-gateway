@@ -1,0 +1,72 @@
+apiVersion: game.kruise.io/v1alpha1
+kind: GameServerSet
+metadata:
+  name: stable-diffusion-cpu # 该模版的自定义名称
+  namespace: sd-webui
+spec:
+  replicas: 1 # 初始的实例数目，要设置为0，代表初始不存在任何实例。
+  scaleStrategy:
+    scaleDownStrategyType: ReserveIds
+  gameServerTemplate:
+    spec:
+      containers:
+        - args:
+            - --listen
+            - --skip-torch-cuda-test
+            - --no-half
+            - --api-log
+          command:
+            - python3
+            - launch.py
+          image: yunqi-registry.cn-shanghai.cr.aliyuncs.com/lab/stable-diffusion:v1.0.0-cpu
+          name: stable-diffusion
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 7860
+            timeoutSeconds: 1
+          volumeMounts:
+            - mountPath: /root/stable-diffusion #持续化数据所在容器中的目录
+              name: user-data
+    volumeClaimTemplates: # 为每一个实例分配持久化存储盘，实例释放但数据不丢失
+      - apiVersion: v1
+        kind: PersistentVolumeClaim
+        metadata:
+          name: user-data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Gi
+          storageClassName: nfs-client
+          volumeMode: Filesystem
+  updateStrategy:
+    rollingUpdate:
+      podUpdatePolicy: InPlaceIfPossible
+      maxUnavailable: 100%
+  network:
+    networkType: Kubernetes-Ingress
+    networkConf:
+      - name: IngressClassName
+        value: nginx
+      - name: Port
+        value: "7860" #AIGC实例暴露的端口
+      - name: Host
+        #AIGC实例访问的域名，每个实例有各自的域名，用<id>区分。如实例0的域名为instances0...; 实例1的域名为instances1...
+        #注意，该域名需要与aigc-gateway具有相同根域名，此例中为c5464a5f2c39341d3b3eda6e2dd37b505.cn-hangzhou.alicontainer.com
+        value: sd-<id>.aigc-gateway.zulong.com
+      - name: PathType
+        value: ImplementationSpecific
+      - name: Path
+        value: /
+      - name: Annotation
+        #用作实例访问鉴权，特定实例的访问权限只属于特定用户。下面的域名替换为AIGC-Gateway实际域名
+        value: 'nginx.ingress.kubernetes.io/auth-url: https://dashboard.aigc-gateway.zulong.com/auth'
+      - name: Annotation
+        #实例访问鉴权失败后进行登录认证。下面的域名替换为AIGC-Gateway实际域名
+        #value: 'nginx.ingress.kubernetes.io/auth-signin: https://dashboard.aigc-gateway.zulong.com/sign-in'
+        value: 'nginx.ingress.kubernetes.io/auth-signin: https://dashboard.aigc-gateway.zulong.com/sign-in'

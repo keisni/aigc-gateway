@@ -1,12 +1,22 @@
-  installation:
+installation:
     namespace: aigc-gateway
-  image:
-    repository: registry.cn-hangzhou.aliyuncs.com/acs/aigc-gateway
-    tag: v1.1.0
-  appId: "32qh5wp6c1q3jofy2myw"
-  appSecret: "35mpn2dk62brjxaduy70"
-  m2mId: "ezxyaol30ld99c7ns5ur"
-  m2mSecret: "g7hly3nwq2omligpyh3k"
-  host: "dashboard.c5464a5f2c39341d3b3eda6e2dd37b55.cn-hangzhou.alicontainer.com"
-  endpoint: "https://logto.c5464a5f2c39341d3b3eda6e2dd37b55.cn-hangzhou.alicontainer.com/"
-  secretName: "tls-logto"
+image:
+    repository: harbor.zulong.com/common-images/aigc-gateway
+    tag: "1.2"
+    pullPolicy: "Always"
+appId: "30ouxfu2adarnexx6bi9i"
+appSecret: "2z11hf98jna6fx96flmb4"
+m2mId: "8c8phprzjd7uy5u6gvdzh"
+m2mSecret: "e80189syaqf6j9fkw2sqw"
+host: "dashboard.aigc-gateway.zulong.com"
+endpoint: "https://logto-dev.zulong.com/"
+secretName: "zfleet-secret"
+redis:
+    address: "redis-master.aigc-gateway.svc.cluster.local:6379"
+antiIdle:
+    limit: "10m"
+hostAliases:
+  - ip: 10.236.254.133
+    hostnames:
+      - logto-dev.zulong.com
+      - dashboard.aigc-gateway.zulong.com

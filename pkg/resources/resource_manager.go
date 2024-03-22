@@ -203,10 +203,10 @@ func (rm *ResourceManager) RecoverResource(meta *ResourceMeta) (Resource, error)
 				if err != nil {
 					return nil, NewResourceError(ApiCallError, "", err.Error())
 				}
-				return nil, NewResourceError(NotFoundError, PauseReason, "")
+				return nil, nil
 			}
 
-			return nil, NewResourceError(NotFoundError, NotExistReason, "")
+			return nil, nil
 		}
 
 		return nil, NewResourceError(ApiCallError, "", err.Error())

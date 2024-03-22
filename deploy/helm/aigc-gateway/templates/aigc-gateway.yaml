@@ -15,11 +15,17 @@ spec:
       labels:
         app: aigc-gateway
     spec:
+    {{- if .Values.hostAliases }}
+      hostAliases: {{ tpl (toYaml .Values.hostAliases) $ | nindent 8 }}
+    {{- end }}
       containers:
         - name: aigc-gateway
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
             - "./aigc-gateway"
+            - --redis-addr={{ .Values.redis.address }}
+            - --idle-limit={{ .Values.antiIdle.limit }}
           env:
             - name: App_Id
               value: {{ .Values.appId }}
