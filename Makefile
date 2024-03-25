@@ -1,4 +1,4 @@
-VERSION ?= 1.2
+VERSION ?= 1.4
 image_registry=harbor.zulong.com/common-images
 gomod_on = GO111MODULE=on
 go_build_cmd = go build
@@ -22,7 +22,9 @@ base-image:
 	docker build $(build_path) --network=host -f Dockerfile.base --tag=$(image_registry)/aigc-base:$(VERSION)
 
 sd-image:
-	docker build $(build_path) -f Dockerfile.sd --tag=$(image_registry)/sd-webui:$(VERSION)
+	docker build $(build_path) \
+		--build-arg http_proxy=http://10.236.12.73:8118 --build-arg https_proxy=http://10.236.12.73:8118 \
+		-f Dockerfile.sd --tag=$(image_registry)/sd-webui:$(VERSION)
 
 image:
 	docker build $(build_path) -f Dockerfile --tag=$(image_registry)/aigc-gateway:$(VERSION)

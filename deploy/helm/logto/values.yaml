@@ -4,3 +4,10 @@ secretName: "zfleet-secret"
 installation:
     namespace: aigc-gateway
     createNamespace: false
+persist:
+    enabled: true
+    sc: local-path
+postgres:
+    enabled: true
+image:
+    tag: 1.4

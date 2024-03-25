@@ -4,11 +4,20 @@ metadata:
   name: stable-diffusion-cpu # 该模版的自定义名称
   namespace: sd-webui
 spec:
-  replicas: 1 # 初始的实例数目，要设置为0，代表初始不存在任何实例。
+  replicas: 0 # 初始的实例数目，要设置为0，代表初始不存在任何实例。
   scaleStrategy:
     scaleDownStrategyType: ReserveIds
   gameServerTemplate:
     spec:
+      initContainers:
+        - name: init
+          image: harbor.zulong.com/common-images/sd-webui:1.4
+          command:
+            - bash
+            - /stable-diffusion-webui/init.sh
+          volumeMounts:
+            - mountPath: /user-data
+              name: user-data
       containers:
         - args:
             - --listen
@@ -18,7 +27,7 @@ spec:
           command:
             - python3
             - launch.py
-          image: yunqi-registry.cn-shanghai.cr.aliyuncs.com/lab/stable-diffusion:v1.0.0-cpu
+          image: harbor.zulong.com/common-images/sd-webui:1.4
           name: stable-diffusion
           readinessProbe:
             failureThreshold: 3
@@ -29,8 +38,15 @@ spec:
               port: 7860
             timeoutSeconds: 1
           volumeMounts:
-            - mountPath: /root/stable-diffusion #持续化数据所在容器中的目录
+            - mountPath: /stable-diffusion-webui/outputs
               name: user-data
+              subPath: output
+            - mountPath: /stable-diffusion-webui/config.json
+              name: user-data
+              subPath: configs/config.json
+            - mountPath: /stable-diffusion-webui/ui-config.json
+              name: user-data
+              subPath: configs/ui-config.json
     volumeClaimTemplates: # 为每一个实例分配持久化存储盘，实例释放但数据不丢失
       - apiVersion: v1
         kind: PersistentVolumeClaim
@@ -65,7 +81,8 @@ spec:
         value: /
       - name: Annotation
         #用作实例访问鉴权，特定实例的访问权限只属于特定用户。下面的域名替换为AIGC-Gateway实际域名
-        value: 'nginx.ingress.kubernetes.io/auth-url: https://dashboard.aigc-gateway.zulong.com/auth'
+        #value: 'nginx.ingress.kubernetes.io/auth-url: https://dashboard.aigc-gateway.zulong.com/auth'
+        value: 'nginx.ingress.kubernetes.io/auth-url: http://aigc-gateway.aigc-gateway.svc.cluster.local:8090/auth'
       - name: Annotation
         #实例访问鉴权失败后进行登录认证。下面的域名替换为AIGC-Gateway实际域名
         #value: 'nginx.ingress.kubernetes.io/auth-signin: https://dashboard.aigc-gateway.zulong.com/sign-in'

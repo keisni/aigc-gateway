@@ -4,19 +4,25 @@ image:
     repository: harbor.zulong.com/common-images/aigc-gateway
     tag: "1.2"
     pullPolicy: "Always"
-appId: "30ouxfu2adarnexx6bi9i"
-appSecret: "2z11hf98jna6fx96flmb4"
-m2mId: "8c8phprzjd7uy5u6gvdzh"
-m2mSecret: "e80189syaqf6j9fkw2sqw"
+appId: "fbanwctzc0dmbw3gtcc2r"
+appSecret: "57a9xrm0362qqihosr4v8"
+m2mId: "4enffl4cozjlv6d9v9au9"
+m2mSecret: "ztbutn47zbouqm0czwxi0"
 host: "dashboard.aigc-gateway.zulong.com"
 endpoint: "https://logto-dev.zulong.com/"
-secretName: "zfleet-secret"
+secretName: "aigc-secret"
 redis:
     address: "redis-master.aigc-gateway.svc.cluster.local:6379"
 antiIdle:
-    limit: "10m"
+    limit: "30m"
 hostAliases:
   - ip: 10.236.254.133
     hostnames:
       - logto-dev.zulong.com
-      - dashboard.aigc-gateway.zulong.com
+      - "dashboard.aigc-gateway.zulong.com"
+secretGen:
+  enabled: false
+  name: aigc-secret
+  crt: server.crt
+  key: server.key
+

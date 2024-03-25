@@ -1,3 +1,11 @@
 FROM yunqi-registry.cn-shanghai.cr.aliyuncs.com/lab/stable-diffusion:v1.0.0-cpu
 
-COPY ./extensions/stable-diffusion-webui-images-browser /stable-diffusion-webui/extensions/
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    xdg-utils && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY ./sd/extensions/stable-diffusion-webui-images-browser /stable-diffusion-webui/extensions/stable-diffusion-webui-images-browser
+COPY ./sd/init.sh /stable-diffusion-webui/init.sh
+COPY ./sd/config.json /stable-diffusion-webui/config.json
+COPY ./sd/ui-config.json /stable-diffusion-webui/ui-config.json
