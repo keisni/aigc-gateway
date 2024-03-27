@@ -1,0 +1,180 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sd-init-script
+  namespace: sd-webui
+data:
+  init.sh: |
+    #!/bin/sh
+    
+    set -e
+    
+    mkdir -p /user-data/output
+    mkdir -p /user-data/configs
+    
+    if [ ! -d "$CONFIG_PATH" ]; then
+      exit -1
+    fi
+    
+    if [ ! -f "/user-data/configs/config.json" ]; then
+      cp $CONFIG_PATH/config.json /user-data/configs/
+    fi
+    
+    if [ ! -f "/user-data/configs/ui-config.json" ]; then
+      cp $CONFIG_PATH/ui-config.json /user-data/configs/
+    fi
+  start.sh: |
+    git config --global --add safe.directory /stable-diffusion-webui/extensions/StyleSelectorXL
+    git config --global --add safe.directory /stable-diffusion-webui/extensions/adetailer
+    git config --global --add safe.directory /stable-diffusion-webui/extensions/sd-dynamic-thresholding
+    git config --global --add safe.directory /stable-diffusion-webui/extensions/sd-webui-controlnet
+    git config --global --add safe.directory /stable-diffusion-webui/extensions/sd-webui-prompt-all-in-one
+    git config --global --add safe.directory /stable-diffusion-webui/extensions/stable-diffusion-webui-localization-zh_Hans
+    git config --global --add safe.directory /stable-diffusion-webui/extensions/stable-diffusion-webui-wildcards
+    git config --global --add safe.directory /stable-diffusion-webui/extensions/ultimate-upscale-for-automatic1111
+    export CUDA_VISIBLE_DEVICES=-1
+    /bin/bash webui.sh -f --listen --use-cpu all --precision full --skip-torch-cuda-test --no-half \
+      --opt-sdp-attention --enable-insecure-extension-access --no-gradio-queue \
+      --theme dark
+---
+apiVersion: game.kruise.io/v1alpha1
+kind: GameServerSet
+metadata:
+  name: stable-diffusion # 该模版的自定义名称
+  namespace: sd-webui
+spec:
+  replicas: 0 # 初始的实例数目，要设置为0，代表初始不存在任何实例。
+  scaleStrategy:
+    scaleDownStrategyType: ReserveIds
+  gameServerTemplate:
+    spec:
+      initContainers:
+        - name: init
+          image: alpine:3.18
+          command:
+            - sh
+            - /script/init.sh
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: CONFIG_PATH
+              value: /shared/configs
+            - name: TZ
+              value: Asia/Shanghai
+          volumeMounts:
+            - name: init-script
+              mountPath: /script
+            - mountPath: /user-data
+              name: shared
+              subPathExpr: user_data/$(POD_NAME)
+            - name: stable-diffusion-nfs
+              mountPath: /shared/configs
+              subPath: mount_sd_v170/configs
+      containers:
+        - image: harbor.zulong.com/yunwei/sd-webui:2.0
+          name: sd
+          command:
+            # - sh
+            # - -c
+            # - sleep infinity
+            - /bin/bash
+            - /script/start.sh
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: TZ
+              value: Asia/Shanghai
+            - name: venv_dir
+              value: "/venv/venv_dir"
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 7860
+            timeoutSeconds: 1
+          volumeMounts:
+            # user data
+            - mountPath: /stable-diffusion-webui/outputs
+              name: shared
+              subPathExpr: user_data/$(POD_NAME)/output
+            - mountPath: /stable-diffusion-webui/config.json
+              name: shared
+              subPathExpr: user_data/$(POD_NAME)/configs/config.json
+            - mountPath: /stable-diffusion-webui/ui-config.json
+              name: shared
+              subPathExpr: user_data/$(POD_NAME)/configs/ui-config.json
+            # shared
+            - name: stable-diffusion-nfs
+              mountPath: /stable-diffusion-webui/extensions
+              subPath: mount_sd_v170/extensions
+            - name: stable-diffusion-nfs
+              mountPath: /stable-diffusion-webui/models
+              subPath: models
+            - name: stable-diffusion-nfs
+              mountPath: /stable-diffusion-webui/embeddings
+              subPath: embeddings
+            # shared-venv
+            - name: shared
+              mountPath: /venv/venv_dir
+              subPath: venv_dir
+            # script
+            - name: init-script
+              mountPath: /script
+      volumes:
+        - name: stable-diffusion-nfs
+          persistentVolumeClaim:
+            claimName: sd-pvc-nfs
+        - name: shared
+          persistentVolumeClaim:
+            claimName: sd-shared-pvc
+        - name: init-script
+          configMap:
+            name: sd-init-script
+    #volumeClaimTemplates: # 为每一个实例分配持久化存储盘，实例释放但数据不丢失
+    #  - apiVersion: v1
+    #    kind: PersistentVolumeClaim
+    #    metadata:
+    #      name: user-data
+    #    spec:
+    #      accessModes:
+    #        - ReadWriteOnce
+    #      resources:
+    #        requests:
+    #          storage: 50Gi
+    #      storageClassName: nfs-client
+    #      volumeMode: Filesystem
+  updateStrategy:
+    rollingUpdate:
+      podUpdatePolicy: InPlaceIfPossible
+      maxUnavailable: 100%
+  network:
+    networkType: Kubernetes-Ingress
+    networkConf:
+      - name: IngressClassName
+        value: nginx
+      - name: Port
+        value: "7860" #AIGC实例暴露的端口
+      - name: Host
+        #AIGC实例访问的域名，每个实例有各自的域名，用<id>区分。如实例0的域名为instances0...; 实例1的域名为instances1...
+        #注意，该域名需要与aigc-gateway具有相同根域名，此例中为c5464a5f2c39341d3b3eda6e2dd37b505.cn-hangzhou.alicontainer.com
+        value: sd-<id>.aigc-gateway.zulong.com
+      - name: PathType
+        value: ImplementationSpecific
+      - name: Path
+        value: /
+      - name: Annotation
+        #用作实例访问鉴权，特定实例的访问权限只属于特定用户。下面的域名替换为AIGC-Gateway实际域名
+        #value: 'nginx.ingress.kubernetes.io/auth-url: https://dashboard.aigc-gateway.zulong.com/auth'
+        value: 'nginx.ingress.kubernetes.io/auth-url: http://aigc-gateway.aigc-gateway.svc.cluster.local:8090/auth'
+      - name: Annotation
+        #实例访问鉴权失败后进行登录认证。下面的域名替换为AIGC-Gateway实际域名
+        #value: 'nginx.ingress.kubernetes.io/auth-signin: https://dashboard.aigc-gateway.zulong.com/sign-in'
+        value: 'nginx.ingress.kubernetes.io/auth-signin: https://dashboard.aigc-gateway.zulong.com/sign-in'

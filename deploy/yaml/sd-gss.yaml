@@ -12,9 +12,13 @@ spec:
       initContainers:
         - name: init
           image: harbor.zulong.com/common-images/sd-webui:1.4
+          imagePullPolicy: Always
           command:
             - bash
             - /stable-diffusion-webui/init.sh
+          env:
+            - name: CONFIG_PATH
+              value: /stable-diffusion-webui
           volumeMounts:
             - mountPath: /user-data
               name: user-data
@@ -28,6 +32,7 @@ spec:
             - python3
             - launch.py
           image: harbor.zulong.com/common-images/sd-webui:1.4
+          imagePullPolicy: Always
           name: stable-diffusion
           readinessProbe:
             failureThreshold: 3
